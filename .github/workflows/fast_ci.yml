@@ -1,4 +1,4 @@
-name: CI
+name: Fast CI
 
 on:
   workflow_dispatch:
