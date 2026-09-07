@@ -1,0 +1,7 @@
+include LICENSE
+include CHANGELOG.md
+include README.md
+include THIRD_PARTY_NOTICES.md
+recursive-include docs *.md
+recursive-include licenses/third_party *.tsv *.md LICENSE COPYING*
+recursive-include src/template py.typed
