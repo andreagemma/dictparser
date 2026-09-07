@@ -1,7 +1,6 @@
 from pathlib import Path
 from typing import Any
 from string import Formatter
-from typing import Hashable
 import json
 
 
@@ -93,11 +92,8 @@ class DictParser:
         elif isinstance(name, tuple):
             name = tuple(self.get_parametric_name(n) for n in name)
         elif isinstance(name, set):  # pyright: ignore[reportUnnecessaryIsInstance]
-            name = {
-                self.get_parametric_name(n)  # pyright: ignore[reportArgumentType]
-                for n in name
-                if isinstance(n, Hashable)
-            }
+            results = (self.get_parametric_name(n) for n in name)
+            name = {n for n in results if isinstance(n, (str, int, float, bool, tuple))}
         return name
 
     def get_all(self) -> dict[str, Any]:
