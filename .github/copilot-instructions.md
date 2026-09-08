@@ -50,6 +50,19 @@ Se rilevante per i file modificati, esegui anche gli script di qualità del prog
 - Nel supporto alla realizzazione della documentazione segui le indicazioni sulla produzione della documentazione.
 - Mantieni aggiornato `MANIFEST.in`
 
+## Workflow qualita e fix
+
+- Usa sempre l'environment corrente attivo per le esecuzioni.
+- Se l'utente chiede una verifica della qualita, esegui nell'ordine:
+	- `ruff check .`
+	- `ruff format --check .`
+	- `mypy`
+- Se l'utente chiede un fix, applica le correzioni e poi riesegui i controlli di qualita.
+- Se l'utente chiede solo il formato, esegui solo:
+	- `ruff format .`
+- In tutti gli altri casi, prova a correggere in base a `ruff check` e `mypy` senza modificare le funzionalita.
+- Dopo le modifiche, verifica sempre con i test (`pytest -q`, o selezione pytest mirata quando appropriato).
+
 ## Sicurezza
 - Non eseguire operazioni distruttive sulla cronologia git.
 - Se i requisiti non sono chiari, chiedi chiarimenti prima di fare refactor estesi.

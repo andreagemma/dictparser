@@ -1,7 +1,19 @@
 name: CI
+run-name: CI - ${{ inputs.commit_name || github.ref_name }}
 
 on:
+  workflow_call:
+    inputs:
+      commit_name:
+        description: Commit name shown in run title
+        required: false
+        type: string
   workflow_dispatch:
+    inputs:
+      commit_name:
+        description: "Commit name shown in run title"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -32,5 +44,3 @@ jobs:
         run: python -m pytest --cov=dictparser --cov-report=term-missing
       - name: Check installed dependencies
         run: python -m pip check
-
-          
