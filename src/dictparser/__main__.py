@@ -8,6 +8,8 @@ from .dictparser import DictParser
 
 
 def _build_parser() -> argparse.ArgumentParser:
+    # Internal helper: build parser.
+    """Internal helper: build parser."""
     parser = argparse.ArgumentParser(description="Read and resolve dictionary/JSON/YAML configuration files.")
     parser.add_argument("file", help="Input configuration file (.json, .yaml, .yml)")
     parser.add_argument("-k", "--key", help="Dot-separated key path to resolve")
@@ -22,6 +24,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
 
 def _to_text(value: Any) -> str:
+    # Internal helper: to text.
+    """Internal helper: to text."""
     if isinstance(value, (dict, list, tuple, set)):
         parser = DictParser({})
         return parser.to_json(value)
@@ -29,6 +33,12 @@ def _to_text(value: Any) -> str:
 
 
 def main() -> int:
+    """Main.
+
+    Returns:
+        TODO describe return value.
+
+    """
     args = _build_parser().parse_args()
     parser = DictParser(args.file)
 

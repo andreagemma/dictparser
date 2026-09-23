@@ -13,6 +13,13 @@ class DictParser:
         params_or_path: dict[str, Any] | str | Path,
         folder: str | Path | None = None,
     ):
+        """Implement `__init__`.
+
+        Args:
+            params_or_path: TODO describe params_or_path.
+            folder: TODO describe folder.
+
+        """
         assert isinstance(params_or_path, (dict, str, Path)), (
             "params_or_path must be a dict or a file path (str or Path)"
         )
@@ -31,6 +38,8 @@ class DictParser:
 
     @staticmethod
     def _normalize_path_parts(path: str, *args: Any) -> list[str]:
+        # Internal helper: normalize path parts.
+        """Internal helper: normalize path parts."""
         keys = path.split(".")
         if args:
             keys = keys + [str(arg) for arg in args if arg is not None]
@@ -38,12 +47,16 @@ class DictParser:
 
     @staticmethod
     def _ensure_dict(value: Any) -> dict[str, Any]:
+        # Internal helper: ensure dict.
+        """Internal helper: ensure dict."""
         if isinstance(value, dict):
             return cast(dict[str, Any], value)
         raise ValueError("The provided source must resolve to a dictionary.")
 
     @staticmethod
     def _clone_value(value: Any) -> Any:
+        # Internal helper: clone value.
+        """Internal helper: clone value."""
         if isinstance(value, dict):
             value_dict = cast(dict[str, Any], value)
             return {k: DictParser._clone_value(v) for k, v in value_dict.items()}
@@ -60,6 +73,8 @@ class DictParser:
 
     @staticmethod
     def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+        # Internal helper: deep merge.
+        """Internal helper: deep merge."""
         merged = {k: DictParser._clone_value(v) for k, v in base.items()}
         for key, value in override.items():
             if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
@@ -74,26 +89,36 @@ class DictParser:
         self,
         source_or_sources: str | Path | dict[str, Any] | list[str | Path | dict[str, Any]],
     ) -> Iterable[str | Path | dict[str, Any]]:
+        # Internal helper: iter sources.
+        """Internal helper: iter sources."""
         if isinstance(source_or_sources, list):
             return source_or_sources
         return [source_or_sources]
 
     def _resolve_file_path(self, file_path: str | Path) -> Path:
+        # Internal helper: resolve file path.
+        """Internal helper: resolve file path."""
         path = Path(file_path)
         if not path.is_absolute():
             path = self.folder / path
         return path.expanduser().resolve()
 
     def _load_source_dict(self, source: str | Path | dict[str, Any]) -> dict[str, Any]:
+        # Internal helper: load source dict.
+        """Internal helper: load source dict."""
         if isinstance(source, dict):
             return source
         resolved = self._resolve_file_path(source)
         return self._load_params_from_file(resolved)
 
     def _refresh_params(self) -> None:
+        # Internal helper: refresh params.
+        """Internal helper: refresh params."""
         self.params = self.get_all()
 
     def _load_params_from_file(self, file_path: str | Path) -> dict[str, Any]:
+        # Internal helper: load params from file.
+        """Internal helper: load params from file."""
         file_path = Path(file_path)
         if not file_path.exists():
             raise FileNotFoundError(f"File not found: {file_path}")
@@ -140,6 +165,8 @@ class DictParser:
         return self.get_parametric_name(value)
 
     def _path_exists(self, path: str) -> bool:
+        # Internal helper: path exists.
+        """Internal helper: path exists."""
         keys = self._normalize_path_parts(path)
         value: Any = self.params
         for key in keys:
@@ -157,6 +184,8 @@ class DictParser:
         return True
 
     def _iter_deep_items(self, value: Any, prefix: str = "") -> Iterator[tuple[str, Any]]:
+        # Internal helper: iter deep items.
+        """Internal helper: iter deep items."""
         if isinstance(value, dict):
             value_dict = cast(dict[str, Any], value)
             for key, item in value_dict.items():
@@ -171,6 +200,16 @@ class DictParser:
                 yield from self._iter_deep_items(item, item_path)
 
     def set(self, path: str, value: Any) -> None:
+        """Set.
+
+        Args:
+            path: TODO describe path.
+            value: TODO describe value.
+
+        Returns:
+            TODO describe return value.
+
+        """
         keys = self._normalize_path_parts(path)
         if not keys:
             raise ValueError("Path cannot be empty")
@@ -216,12 +255,31 @@ class DictParser:
         self._refresh_params()
 
     def setdefault(self, path: str, default: Any = None) -> Any:
+        """Setdefault.
+
+        Args:
+            path: TODO describe path.
+            default: TODO describe default.
+
+        Returns:
+            TODO describe return value.
+
+        """
         if self._path_exists(path):
             return self.get(path)
         self.set(path, default)
         return self.get(path)
 
     def delete(self, path: str) -> None:
+        """Delete.
+
+        Args:
+            path: TODO describe path.
+
+        Returns:
+            TODO describe return value.
+
+        """
         keys = self._normalize_path_parts(path)
         if not keys:
             raise KeyError("Path cannot be empty")
@@ -256,6 +314,15 @@ class DictParser:
         self._refresh_params()
 
     def include(self, source_or_sources: str | Path | dict[str, Any] | list[str | Path | dict[str, Any]]) -> None:
+        """Include.
+
+        Args:
+            source_or_sources: TODO describe source_or_sources.
+
+        Returns:
+            TODO describe return value.
+
+        """
         included: dict[str, Any] = {}
         for source in self._iter_sources(source_or_sources):
             loaded = self._ensure_dict(self._load_source_dict(source))
@@ -264,6 +331,15 @@ class DictParser:
         self._refresh_params()
 
     def update(self, source_or_sources: str | Path | dict[str, Any] | list[str | Path | dict[str, Any]]) -> None:
+        """Update.
+
+        Args:
+            source_or_sources: TODO describe source_or_sources.
+
+        Returns:
+            TODO describe return value.
+
+        """
         updates: dict[str, Any] = {}
         for source in self._iter_sources(source_or_sources):
             loaded = self._ensure_dict(self._load_source_dict(source))
@@ -272,6 +348,16 @@ class DictParser:
         self._refresh_params()
 
     def contains(self, key: str, deep: bool = False) -> bool:
+        """Contains.
+
+        Args:
+            key: TODO describe key.
+            deep: TODO describe deep.
+
+        Returns:
+            TODO describe return value.
+
+        """
         if self._path_exists(key):
             return True
         if not deep:
@@ -283,20 +369,67 @@ class DictParser:
         return False
 
     def has_key(self, key: str, deep: bool = False) -> bool:
+        """Has key.
+
+        Args:
+            key: TODO describe key.
+            deep: TODO describe deep.
+
+        Returns:
+            TODO describe return value.
+
+        """
         return self.contains(key, deep=deep)
 
     def items(self, deep: bool = False) -> list[tuple[str, Any]]:
+        """Items.
+
+        Args:
+            deep: TODO describe deep.
+
+        Returns:
+            TODO describe return value.
+
+        """
         if not deep:
             return list(self.params.items())
         return list(self._iter_deep_items(self.params))
 
     def keys(self, deep: bool = False) -> list[str]:
+        """Keys.
+
+        Args:
+            deep: TODO describe deep.
+
+        Returns:
+            TODO describe return value.
+
+        """
         return [key for key, _ in self.items(deep=deep)]
 
     def values(self, deep: bool = False) -> list[Any]:
+        """Values.
+
+        Args:
+            deep: TODO describe deep.
+
+        Returns:
+            TODO describe return value.
+
+        """
         return [value for _, value in self.items(deep=deep)]
 
     def pop(self, path: str, default: Any = _MISSING) -> Any:
+        """Pop.
+
+        Args:
+            path: TODO describe path.
+            default: TODO describe default.
+
+        Returns:
+            TODO describe return value.
+
+        """
         if not self._path_exists(path):
             if default is _MISSING:
                 raise KeyError(path)
@@ -306,6 +439,15 @@ class DictParser:
         return value
 
     def popitem(self, deep: bool = False) -> tuple[str, Any]:
+        """Popitem.
+
+        Args:
+            deep: TODO describe deep.
+
+        Returns:
+            TODO describe return value.
+
+        """
         if deep:
             deep_items = self.items(deep=True)
             if not deep_items:
@@ -322,40 +464,111 @@ class DictParser:
         return key, value
 
     def clear(self) -> None:
+        """Clear.
+
+        Returns:
+            TODO describe return value.
+
+        """
         self.params.clear()
 
     def copy(self) -> dict[str, Any]:
+        """Copy.
+
+        Returns:
+            TODO describe return value.
+
+        """
         return self.params.copy()
 
     def __getitem__(self, key: str) -> Any:
+        """Implement `__getitem__`.
+
+        Args:
+            key: TODO describe key.
+
+        Returns:
+            TODO describe return value.
+
+        """
         if not self._path_exists(key):
             raise KeyError(key)
         return self.get(key)
 
     def __setitem__(self, key: str, value: Any) -> None:
+        """Implement `__setitem__`.
+
+        Args:
+            key: TODO describe key.
+            value: TODO describe value.
+
+        Returns:
+            TODO describe return value.
+
+        """
         self.set(key, value)
 
     def __delitem__(self, key: str) -> None:
+        """Implement `__delitem__`.
+
+        Args:
+            key: TODO describe key.
+
+        Returns:
+            TODO describe return value.
+
+        """
         self.delete(key)
 
     def __contains__(self, key: object) -> bool:
+        """Implement `__contains__`.
+
+        Args:
+            key: TODO describe key.
+
+        Returns:
+            TODO describe return value.
+
+        """
         if not isinstance(key, str):
             return False
         return self.contains(key, deep=False)
 
     def __iter__(self) -> Iterator[str]:
+        """Implement `__iter__`.
+
+        Returns:
+            TODO describe return value.
+
+        """
         return iter(self.params)
 
     def __len__(self) -> int:
+        """Implement `__len__`.
+
+        Returns:
+            TODO describe return value.
+
+        """
         return len(self.params)
 
     def _normlize_key(self, key: str) -> str:
         """
         Normalize a key by removing leading/trailing whitespace and converting to lowercase.
         """
+        # Internal helper: normlize key.
         return key.replace(".", "_").lower()
 
     def get_parametric_name(self, name: str | dict[str, Any] | list[Any] | tuple[Any, ...] | Set[Any]) -> Any:
+        """Get parametric name.
+
+        Args:
+            name: TODO describe name.
+
+        Returns:
+            TODO describe return value.
+
+        """
         if isinstance(name, str):
             # Start from top-level params so placeholders can reference sibling keys.
             kwargs = self.params.copy()
