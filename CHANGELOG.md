@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- Bumped package/build version from `0.1.2` to `0.1.3`.
+
 ## 0.1.2 - 2026-09-08
 
 ### Added
