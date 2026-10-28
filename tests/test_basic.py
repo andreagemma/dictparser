@@ -172,3 +172,29 @@ def test_set_setdefault_mapping_like_helpers_and_deep_options() -> None:
 
     parser.clear()
     assert len(parser) == 0
+
+
+def test_merge_supports_parser_and_none_source() -> None:
+    parser = DictParser({"db": {"host": "prod", "port": 5432}})
+    parser.merge(None)
+    assert parser.get("db.host") == "prod"
+
+    parser.merge(DictParser({"db": {"host": "override"}, "env": "dev"}))
+    assert parser.get("db.host") == "override"
+    assert parser.get("db.port") == 5432
+    assert parser.get("env") == "dev"
+
+
+def test_get_supports_wildcard_with_raw_source_lookup() -> None:
+    parser = DictParser({"a": "x", "b": "y", "items": ["{a}", "{b}"]})
+    assert parser.get("items.*") == ["x", "y"]
+    assert parser.get("items.*", use_cache=False) == ["x", "y"]
+
+
+def test_copy_can_return_source_or_resolved_values() -> None:
+    parser = DictParser({"name": "alice", "msg": "hello {name}"})
+    raw = parser.copy(parsed=False)
+    resolved = parser.copy(parsed=True)
+
+    assert raw["msg"] == "hello {name}"
+    assert resolved["msg"] == "hello alice"

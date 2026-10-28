@@ -54,6 +54,14 @@ Resolution is recursive for container types (`dict`, `list`, `tuple`, `set`).
 ## Mutable Return Values
 
 `get(..., copy=True)` returns a shallow copy for `dict` and `list` values to avoid unintended mutations.
+`get(..., use_cache=False)` reads directly from source values before cache refresh.
+
+Wildcard sequence access is supported:
+
+```python
+parser = DictParser({"a": "x", "items": ["{a}", "literal"]})
+assert parser.get("items.*") == ["x", "literal"]
+```
 
 ## Include and Update
 
@@ -66,6 +74,9 @@ Resolution is recursive for container types (`dict`, `list`, `tuple`, `set`).
 `include(...)` applies deep merge using loaded params as defaults and keeping current params precedence.
 
 `update(...)` applies deep merge with inverse precedence, so loaded params override current params.
+
+`merge(...)` is a convenience wrapper accepting dictionaries, paths, parsers, or
+`None`.
 
 ## Dictionary-Like API
 

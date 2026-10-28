@@ -33,11 +33,10 @@ def _to_text(value: Any) -> str:
 
 
 def main() -> int:
-    """Main.
+    """Run the DictParser CLI entry point.
 
     Returns:
-        TODO describe return value.
-
+        Process exit code.
     """
     args = _build_parser().parse_args()
     parser = DictParser(args.file)

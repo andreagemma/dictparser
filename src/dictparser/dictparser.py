@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Any, Iterable, Iterator, Set, cast
 from string import Formatter
@@ -8,33 +10,75 @@ _MISSING = object()
 
 
 class DictParser:
+    """Dictionary-based configuration parser with placeholder resolution."""
+
     def __init__(
         self,
-        params_or_path: dict[str, Any] | str | Path,
+        params_or_path: dict[str, Any] | str | Path | DictParser | None,
         folder: str | Path | None = None,
-    ):
-        """Implement `__init__`.
+    ) -> None:
+        """Create a parser from a mapping, file path, parser, or empty source.
 
         Args:
-            params_or_path: TODO describe params_or_path.
-            folder: TODO describe folder.
-
+            params_or_path: Source dictionary, JSON/YAML path, existing parser,
+                or ``None`` for an empty parser.
+            folder: Base folder used to resolve relative include/update paths.
         """
-        assert isinstance(params_or_path, (dict, str, Path)), (
-            "params_or_path must be a dict or a file path (str or Path)"
+        self._params: dict[str, Any] = {}
+        self._original_params: dict[str, Any] = {}
+        self.cached = False
+        if params_or_path is None:
+            self.folder = Path.cwd()
+            return
+        assert isinstance(params_or_path, (dict, str, Path, DictParser)), (
+            f"params_or_path must be a dict, a DictParser instance, or a file path (str or Path) and not {type(params_or_path)}"
         )
 
         if isinstance(params_or_path, dict):
             runtime_folder = Path.cwd()
-            self.params: dict[str, Any] = params_or_path
+            self._params = params_or_path
+        elif isinstance(params_or_path, DictParser):
+            runtime_folder = params_or_path.folder
+            self._params = params_or_path.params.copy()
         else:
             path = Path(params_or_path)
             runtime_folder = path.expanduser().resolve().parent
-            self.params = self._load_params_from_file(params_or_path)
+            self._params = self._load_params_from_file(params_or_path)
+        self._original_params = self._params.copy()
 
         self.folder = (Path(folder) if folder is not None else runtime_folder).expanduser().resolve()
+        self._invalidate_cache()
 
-        self.params = self.get_all()
+    @property
+    def params(self) -> dict[str, Any]:
+        """Return resolved parameters, rebuilding the cache when required."""
+        if not self.cached:
+            self._refresh_params()
+        return self._params
+
+    @params.setter
+    def params(self, value: dict[str, Any]) -> None:
+        """Replace source parameters and refresh the resolved cache."""
+        self._original_params = value.copy()
+        self._invalidate_cache()
+        self._refresh_params()
+
+    def merge(
+        self,
+        params_or_path: dict[str, Any] | str | Path | DictParser | None,
+        folder: str | Path | None = None,
+    ) -> None:
+        """Merge another source into the current source with override precedence.
+
+        Args:
+            params_or_path: Source dictionary, file path, parser, or ``None``.
+            folder: Optional base folder when ``params_or_path`` is path-based.
+        """
+        if params_or_path is None:
+            return
+        other = DictParser(params_or_path, folder=folder)
+        self._original_params = self._deep_merge(self._original_params, other._original_params)
+        self._invalidate_cache()
 
     @staticmethod
     def _normalize_path_parts(path: str, *args: Any) -> list[str]:
@@ -111,10 +155,17 @@ class DictParser:
         resolved = self._resolve_file_path(source)
         return self._load_params_from_file(resolved)
 
+    def _invalidate_cache(self) -> None:
+        # Internal helper: invalidate cache.
+        """Internal helper: invalidate cache."""
+        self._params = {}
+        self.cached = False
+
     def _refresh_params(self) -> None:
         # Internal helper: refresh params.
         """Internal helper: refresh params."""
-        self.params = self.get_all()
+        self._params = self.get_all()
+        self.cached = True
 
     def _load_params_from_file(self, file_path: str | Path) -> dict[str, Any]:
         # Internal helper: load params from file.
@@ -139,19 +190,47 @@ class DictParser:
         else:
             raise ValueError("Unsupported file format. Use .json or .yaml/.yml.")
 
-    def get(self, path: str, *args: Any, default: Any = None, copy: bool = True) -> Any:
-        """
-        Get a parameter from the params dictionary using a dot-separated path.
+    def get(self, path: str, *args: Any, default: Any = None, copy: bool = True, use_cache: bool = True) -> Any:
+        """Get a value by dot-path with optional wildcard list expansion.
+
+        Args:
+            path: Dot-separated key path.
+            *args: Optional additional path segments appended to ``path``.
+            default: Fallback value when the path does not exist.
+            copy: When ``True``, shallow-copy ``dict`` and ``list`` results.
+            use_cache: When ``True``, read from resolved cached parameters.
+
+        Returns:
+            Resolved value, wildcard-expanded list, or ``default`` when missing.
         """
         # Build the navigation path, supporting optional additional path fragments.
         keys = self._normalize_path_parts(path, *args)
-        value: dict[str, Any] | list[Any] | tuple[Any, ...] | None = self.params
-        for key in keys:
+        value: dict[str, Any] | list[Any] | tuple[Any, ...] | None = self.params if use_cache else self._original_params
+        parsed: bool = False
+        for i in range(len(keys)):
+            key: str = keys[i]
             # Dispatch lookup by container type: mapping keys or sequence indexes.
             if isinstance(value, (dict)) and key in value:
                 value = value[key]
             elif isinstance(value, (list, tuple)) and key.isdigit():
                 value = value[int(key)]
+            elif isinstance(value, (list, tuple)) and key == "*":
+                if i < len(keys) - 1:
+                    value = [
+                        self.get(
+                            ".".join(keys[:i] + [str(idx)] + keys[i + 1 :]),
+                            default=default,
+                            use_cache=use_cache,
+                        )
+                        for idx, _ in enumerate(value)
+                    ]
+                else:
+                    value = [
+                        self.get(".".join(keys[:i] + [str(idx)]), default=default, use_cache=use_cache)
+                        for idx, _ in enumerate(value)
+                    ]
+                parsed = True
+                break
             else:
                 return self.get_parametric_name(default)
         # Return a shallow copy for mutable collections by default to prevent accidental in-place edits.
@@ -162,7 +241,10 @@ class DictParser:
                 value = value.copy()
         if value is None:
             return self.get_parametric_name(default)
-        return self.get_parametric_name(value)
+        if parsed:
+            return value
+        else:
+            return self.get_parametric_name(value)
 
     def _path_exists(self, path: str) -> bool:
         # Internal helper: path exists.
@@ -200,21 +282,17 @@ class DictParser:
                 yield from self._iter_deep_items(item, item_path)
 
     def set(self, path: str, value: Any) -> None:
-        """Set.
+        """Set or create a value at a dot-path.
 
         Args:
-            path: TODO describe path.
-            value: TODO describe value.
-
-        Returns:
-            TODO describe return value.
-
+            path: Dot-separated target path.
+            value: Value assigned at the target path.
         """
         keys = self._normalize_path_parts(path)
         if not keys:
             raise ValueError("Path cannot be empty")
 
-        current: Any = self.params
+        current: Any = self._original_params
         for index, key in enumerate(keys[:-1]):
             next_key = keys[index + 1]
             next_is_index = next_key.isdigit()
@@ -252,18 +330,17 @@ class DictParser:
         else:
             raise KeyError("Cannot assign to non-container target")
 
-        self._refresh_params()
+        self._invalidate_cache()
 
     def setdefault(self, path: str, default: Any = None) -> Any:
-        """Setdefault.
+        """Get a path value, creating it with ``default`` when missing.
 
         Args:
-            path: TODO describe path.
-            default: TODO describe default.
+            path: Dot-separated target path.
+            default: Value used when ``path`` is missing.
 
         Returns:
-            TODO describe return value.
-
+            Existing or newly assigned value at ``path``.
         """
         if self._path_exists(path):
             return self.get(path)
@@ -271,20 +348,16 @@ class DictParser:
         return self.get(path)
 
     def delete(self, path: str) -> None:
-        """Delete.
+        """Delete a value at a dot-path.
 
         Args:
-            path: TODO describe path.
-
-        Returns:
-            TODO describe return value.
-
+            path: Dot-separated target path.
         """
         keys = self._normalize_path_parts(path)
         if not keys:
             raise KeyError("Path cannot be empty")
 
-        current: Any = self.params
+        current: Any = self._original_params
         for key in keys[:-1]:
             if isinstance(current, dict) and key in current:
                 current_dict = cast(dict[str, Any], current)
@@ -311,52 +384,43 @@ class DictParser:
         else:
             raise KeyError(path)
 
-        self._refresh_params()
+        self._invalidate_cache()
 
     def include(self, source_or_sources: str | Path | dict[str, Any] | list[str | Path | dict[str, Any]]) -> None:
-        """Include.
+        """Include a source without overriding existing values.
 
         Args:
-            source_or_sources: TODO describe source_or_sources.
-
-        Returns:
-            TODO describe return value.
-
+            source_or_sources: One or more dictionaries or JSON/YAML paths.
         """
         included: dict[str, Any] = {}
         for source in self._iter_sources(source_or_sources):
             loaded = self._ensure_dict(self._load_source_dict(source))
             included = self._deep_merge(included, loaded)
-        self.params = self._deep_merge(included, self.params)
-        self._refresh_params()
+        self._original_params = self._deep_merge(included, self._original_params)
+        self._invalidate_cache()
 
     def update(self, source_or_sources: str | Path | dict[str, Any] | list[str | Path | dict[str, Any]]) -> None:
-        """Update.
+        """Update current parameters with one or more overriding sources.
 
         Args:
-            source_or_sources: TODO describe source_or_sources.
-
-        Returns:
-            TODO describe return value.
-
+            source_or_sources: One or more dictionaries or JSON/YAML paths.
         """
-        updates: dict[str, Any] = {}
+        updated: dict[str, Any] = {}
         for source in self._iter_sources(source_or_sources):
             loaded = self._ensure_dict(self._load_source_dict(source))
-            updates = self._deep_merge(updates, loaded)
-        self.params = self._deep_merge(self.params, updates)
-        self._refresh_params()
+            updated = self._deep_merge(loaded, updated)
+        self._original_params = self._deep_merge(self._original_params, updated)
+        self._invalidate_cache()
 
     def contains(self, key: str, deep: bool = False) -> bool:
-        """Contains.
+        """Check whether a key path exists.
 
         Args:
-            key: TODO describe key.
-            deep: TODO describe deep.
+            key: Dot path or key name.
+            deep: When ``True``, also match nested key names.
 
         Returns:
-            TODO describe return value.
-
+            ``True`` when the key is found.
         """
         if self._path_exists(key):
             return True
@@ -369,66 +433,61 @@ class DictParser:
         return False
 
     def has_key(self, key: str, deep: bool = False) -> bool:
-        """Has key.
+        """Alias of :meth:`contains`.
 
         Args:
-            key: TODO describe key.
-            deep: TODO describe deep.
+            key: Dot path or key name.
+            deep: When ``True``, also match nested key names.
 
         Returns:
-            TODO describe return value.
-
+            ``True`` when the key is found.
         """
         return self.contains(key, deep=deep)
 
     def items(self, deep: bool = False) -> list[tuple[str, Any]]:
-        """Items.
+        """Return key-value pairs.
 
         Args:
-            deep: TODO describe deep.
+            deep: When ``True``, include nested dot-path entries.
 
         Returns:
-            TODO describe return value.
-
+            List of key-value pairs.
         """
         if not deep:
             return list(self.params.items())
         return list(self._iter_deep_items(self.params))
 
     def keys(self, deep: bool = False) -> list[str]:
-        """Keys.
+        """Return keys.
 
         Args:
-            deep: TODO describe deep.
+            deep: When ``True``, include nested dot-path keys.
 
         Returns:
-            TODO describe return value.
-
+            List of keys.
         """
         return [key for key, _ in self.items(deep=deep)]
 
     def values(self, deep: bool = False) -> list[Any]:
-        """Values.
+        """Return values.
 
         Args:
-            deep: TODO describe deep.
+            deep: When ``True``, include values from nested entries.
 
         Returns:
-            TODO describe return value.
-
+            List of values.
         """
         return [value for _, value in self.items(deep=deep)]
 
     def pop(self, path: str, default: Any = _MISSING) -> Any:
-        """Pop.
+        """Remove and return a value from a dot-path.
 
         Args:
-            path: TODO describe path.
-            default: TODO describe default.
+            path: Dot-separated target path.
+            default: Returned when ``path`` is missing.
 
         Returns:
-            TODO describe return value.
-
+            Removed value, or ``default`` when provided and missing.
         """
         if not self._path_exists(path):
             if default is _MISSING:
@@ -439,14 +498,13 @@ class DictParser:
         return value
 
     def popitem(self, deep: bool = False) -> tuple[str, Any]:
-        """Popitem.
+        """Remove and return one key-value pair.
 
         Args:
-            deep: TODO describe deep.
+            deep: When ``True``, remove the last nested item by deep traversal.
 
         Returns:
-            TODO describe return value.
-
+            Removed key and value.
         """
         if deep:
             deep_items = self.items(deep=True)
@@ -460,95 +518,82 @@ class DictParser:
         if not self.params:
             raise KeyError("popitem(): dictionary is empty")
         key, value = self.params.popitem()
-        self._refresh_params()
+        self._original_params.pop(key)
+        self._invalidate_cache()
         return key, value
 
     def clear(self) -> None:
-        """Clear.
+        """Remove all source parameters and invalidate the resolved cache."""
+        self._original_params.clear()
+        self._invalidate_cache()
 
-        Returns:
-            TODO describe return value.
-
-        """
-        self.params.clear()
-
-    def copy(self) -> dict[str, Any]:
-        """Copy.
-
-        Returns:
-            TODO describe return value.
-
-        """
-        return self.params.copy()
-
-    def __getitem__(self, key: str) -> Any:
-        """Implement `__getitem__`.
+    def copy(self, parsed: bool = False) -> dict[str, Any]:
+        """Return a shallow copy of source or resolved parameters.
 
         Args:
-            key: TODO describe key.
+            parsed: When ``True``, return resolved parameters.
 
         Returns:
-            TODO describe return value.
+            Copied parameter dictionary.
+        """
+        return self._original_params.copy() if not parsed else self.params.copy()
 
+    def __getitem__(self, key: str) -> Any:
+        """Return a value by dot-path.
+
+        Args:
+            key: Dot-separated target path.
+
+        Returns:
+            Value associated with ``key``.
         """
         if not self._path_exists(key):
             raise KeyError(key)
         return self.get(key)
 
     def __setitem__(self, key: str, value: Any) -> None:
-        """Implement `__setitem__`.
+        """Assign a value using dot-path semantics.
 
         Args:
-            key: TODO describe key.
-            value: TODO describe value.
-
-        Returns:
-            TODO describe return value.
-
+            key: Dot-separated target path.
+            value: Value assigned at ``key``.
         """
         self.set(key, value)
 
     def __delitem__(self, key: str) -> None:
-        """Implement `__delitem__`.
+        """Delete a value by dot-path.
 
         Args:
-            key: TODO describe key.
-
-        Returns:
-            TODO describe return value.
-
+            key: Dot-separated target path.
         """
         self.delete(key)
 
     def __contains__(self, key: object) -> bool:
-        """Implement `__contains__`.
+        """Return whether a top-level path exists.
 
         Args:
-            key: TODO describe key.
+            key: Candidate key object.
 
         Returns:
-            TODO describe return value.
-
+            ``True`` only for existing string keys.
         """
         if not isinstance(key, str):
             return False
         return self.contains(key, deep=False)
 
     def __iter__(self) -> Iterator[str]:
-        """Implement `__iter__`.
+        """Iterate over top-level keys.
 
         Returns:
-            TODO describe return value.
-
+            Iterator over top-level key names.
         """
         return iter(self.params)
 
     def __len__(self) -> int:
-        """Implement `__len__`.
+        """Return number of top-level keys.
 
         Returns:
-            TODO describe return value.
-
+            Number of top-level items.
         """
         return len(self.params)
 
@@ -560,25 +605,24 @@ class DictParser:
         return key.replace(".", "_").lower()
 
     def get_parametric_name(self, name: str | dict[str, Any] | list[Any] | tuple[Any, ...] | Set[Any]) -> Any:
-        """Get parametric name.
+        """Resolve placeholders recursively in strings and nested containers.
 
         Args:
-            name: TODO describe name.
+            name: Value or container potentially containing ``{path}`` placeholders.
 
         Returns:
-            TODO describe return value.
-
+            Value with placeholders resolved.
         """
         if isinstance(name, str):
             # Start from top-level params so placeholders can reference sibling keys.
-            kwargs = self.params.copy()
+            kwargs = self._original_params.copy()
             keys = [i[1] for i in Formatter().parse(name) if i[1] is not None and i[1] not in kwargs]
             # print(keys)
             if keys:
                 for k in keys:
                     if k not in kwargs:
                         # Resolve missing placeholders recursively through the same public API.
-                        kwargs[k] = self.get(k)
+                        kwargs[k] = self.get(k, use_cache=False)
                     else:
                         kwargs[k] = k
             for k in kwargs:
@@ -599,7 +643,7 @@ class DictParser:
         """
         Get the entire params dictionary with all placeholders resolved.
         """
-        return self.get_parametric_name(self.params)
+        return self.get_parametric_name(self._original_params)
 
     def to_json(self, data: Any = None, indent: int = 2, ensure_ascii: bool = False) -> str:
         """

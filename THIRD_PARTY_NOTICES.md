@@ -6,40 +6,40 @@ This project includes third-party dependencies. Their license texts are archived
 
 - Version: 6.0.3
 - License file: LICENSE
-- Source URL: https://pyyaml.org/
+- Source URL: https://github.com/yaml/pyyaml
 
 ## pytest
 
 - Version: 9.1.1
 - License file: LICENSE
-- Source URL: https://docs.pytest.org/en/latest/
+- Source URL: https://github.com/pytest-dev/pytest
 
 ## pytest-cov
 
 - Version: 7.1.0
 - License file: LICENSE
-- Source URL: https://pypi.org/project/pytest-cov/
+- Source URL: https://github.com/pytest-dev/pytest-cov
 
 ## build
 
-- Version: 1.6.0
+- Version: 1.6.1
 - License file: LICENSE
-- Source URL: https://build.pypa.io
+- Source URL: https://github.com/pypa/build
 
 ## mypy
 
-- Version: 2.3.1
+- Version: 2.4.0
 - License file: LICENSE
-- Source URL: https://www.mypy-lang.org/
+- Source URL: https://github.com/python/mypy
 
 ## ruff
 
-- Version: 0.16.6
+- Version: 0.17.0
 - License file: LICENSE
-- Source URL: https://docs.astral.sh/ruff
+- Source URL: https://github.com/astral-sh/ruff
 
 ## twine
 
 - Version: 7.0.0
 - License file: LICENSE
-- Source URL: https://twine.readthedocs.io/
+- Source URL: https://github.com/pypa/twine

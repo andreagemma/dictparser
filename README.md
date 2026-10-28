@@ -68,6 +68,8 @@ parser = DictParser({"a": 1}, folder="/tmp/configs")
 `include(...)`: loads new params as defaults, then keeps current params precedence.
 
 `update(...)`: inverse behavior, new params override current params.
+`merge(...)`: convenience wrapper accepting dictionaries, paths, parser instances,
+or `None`.
 
 ```python
 parser = DictParser({"db": {"host": "prod"}})
@@ -107,6 +109,16 @@ The resolver internally dispatches by container type while navigating paths:
 - recursive placeholder expansion for nested containers
 
 This behavior is now documented directly in source comments in `src/dictparser/dictparser.py`.
+
+`get(..., use_cache=False)` resolves directly from raw source values before cache
+materialization.
+
+Wildcard sequence access is also supported:
+
+```python
+parser = DictParser({"a": "x", "items": ["{a}", "literal"]})
+assert parser.get("items.*") == ["x", "literal"]
+```
 
 ### API Additions
 

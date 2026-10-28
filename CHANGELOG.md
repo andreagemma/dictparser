@@ -2,9 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.1.4 - Unreleased
+
+- Added cache-safe wildcard path resolution in `get(...)` with explicit
+  `use_cache` propagation.
+- Added merge regression tests for parser sources, wildcard lookups, and
+  resolved-vs-source copy behavior.
+- Completed and aligned runtime docstrings in library and CLI modules.
+- Fixed package manifest typed marker path to `src/dictparser/py.typed`.
+- Refreshed third-party license metadata and archived license files.
+- Bumped package/build version from `0.1.3` to `0.1.4`.
+
+## 0.1.3
 
 - Bumped package/build version from `0.1.2` to `0.1.3`.
+
+### Documentation
+
+- Added focused inline comments in `src/dictparser/dictparser.py` to explain path/type dispatch and recursive placeholder resolution.
+- Added a complete `README.md` with installation, quick usage, and behavior notes.
+- Added project documentation index and library/CLI pages in `docs/`.
+
+### Compliance
+
+- Added third-party license archive under `licenses/third_party/packages/`.
+- Added `licenses/third_party/summary.tsv` with package, version, license path, and source URL.
+- Added `THIRD_PARTY_NOTICES.md` with dependency notice details.
 
 ## 0.1.2 - 2026-09-08
 
@@ -63,18 +86,3 @@ All notable changes to this project will be documented in this file.
 	- single key output via `-k/--key`
 	- file output via `-o/--output`
 	- forced output format via `-f/--format json|yaml`
-
-## Unreleased
-
-### Documentation
-
-- Added focused inline comments in `src/dictparser/dictparser.py` to explain path/type dispatch and recursive placeholder resolution.
-- Added a complete `README.md` with installation, quick usage, and behavior notes.
-- Added project documentation index and library/CLI pages in `docs/`.
-
-### Compliance
-
-- Added third-party license archive under `licenses/third_party/packages/`.
-- Added `licenses/third_party/summary.tsv` with package, version, license path, and source URL.
-- Added `THIRD_PARTY_NOTICES.md` with dependency notice details.
-
