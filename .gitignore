@@ -13,6 +13,7 @@ __pycache__/
 coverage.xml
 .ignore
 .dmypy.json
+./quality_tests.sh
 
 # Build artifacts
 build/
